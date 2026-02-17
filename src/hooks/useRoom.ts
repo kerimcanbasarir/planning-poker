@@ -2,7 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Socket } from "socket.io-client";
-import { RoomView, VoteResults, ClientToServerEvents, ServerToClientEvents, CardSetType } from "@/types";
+import {
+  RoomView,
+  VoteResults,
+  ClientToServerEvents,
+  ServerToClientEvents,
+  CardSetType,
+  SkillType,
+  EmojiAnimation,
+  SkillAnimation,
+} from "@/types";
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -10,6 +19,9 @@ export function useRoom(socket: TypedSocket | null) {
   const [room, setRoom] = useState<RoomView | null>(null);
   const [results, setResults] = useState<VoteResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [emojiAnimations, setEmojiAnimations] = useState<EmojiAnimation[]>([]);
+  const [skillAnimations, setSkillAnimations] = useState<SkillAnimation[]>([]);
+  const [activeSkillEffects, setActiveSkillEffects] = useState<Record<string, SkillType>>({});
 
   useEffect(() => {
     if (!socket) return;
@@ -17,7 +29,6 @@ export function useRoom(socket: TypedSocket | null) {
     function onRoomState(data: RoomView) {
       setRoom(data);
       setError(null);
-      // Clear results when phase changes to voting
       if (data.phase === "voting") {
         setResults(null);
       }
@@ -28,15 +39,52 @@ export function useRoom(socket: TypedSocket | null) {
     function onError(data: { message: string }) {
       setError(data.message);
     }
+    function onPlayerMoved(data: { playerId: string; x: number; y: number }) {
+      setRoom((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          participants: prev.participants.map((p) =>
+            p.id === data.playerId ? { ...p, position: { x: data.x, y: data.y } } : p
+          ),
+        };
+      });
+    }
+    function onEmojiReceived(data: EmojiAnimation) {
+      setEmojiAnimations((prev) => [...prev, data]);
+      setTimeout(() => {
+        setEmojiAnimations((prev) => prev.filter((e) => e.id !== data.id));
+      }, 1200);
+    }
+    function onSkillReceived(data: SkillAnimation) {
+      setSkillAnimations((prev) => [...prev, data]);
+      setActiveSkillEffects((prev) => ({ ...prev, [data.targetId]: data.skill }));
+      setTimeout(() => {
+        setSkillAnimations((prev) => prev.filter((s) => s.id !== data.id));
+      }, 1500);
+      setTimeout(() => {
+        setActiveSkillEffects((prev) => {
+          const next = { ...prev };
+          delete next[data.targetId];
+          return next;
+        });
+      }, 2000);
+    }
 
     socket.on("room:state", onRoomState);
     socket.on("vote:results", onVoteResults);
     socket.on("room:error", onError);
+    socket.on("player:moved", onPlayerMoved);
+    socket.on("emoji:received", onEmojiReceived as any);
+    socket.on("skill:received", onSkillReceived as any);
 
     return () => {
       socket.off("room:state", onRoomState);
       socket.off("vote:results", onVoteResults);
       socket.off("room:error", onError);
+      socket.off("player:moved", onPlayerMoved);
+      socket.off("emoji:received", onEmojiReceived as any);
+      socket.off("skill:received", onSkillReceived as any);
     };
   }, [socket]);
 
@@ -76,15 +124,42 @@ export function useRoom(socket: TypedSocket | null) {
     [socket]
   );
 
+  const movePlayer = useCallback(
+    (x: number, y: number) => {
+      socket?.emit("player:move", { x, y });
+    },
+    [socket]
+  );
+
+  const throwEmoji = useCallback(
+    (targetId: string, emoji: string) => {
+      socket?.emit("emoji:throw", { targetId, emoji });
+    },
+    [socket]
+  );
+
+  const useSkill = useCallback(
+    (targetId: string, skill: SkillType) => {
+      socket?.emit("skill:use", { targetId, skill });
+    },
+    [socket]
+  );
+
   return {
     room,
     results,
     error,
+    emojiAnimations,
+    skillAnimations,
+    activeSkillEffects,
     createRoom,
     joinRoom,
     castVote,
     revealVotes,
     resetVotes,
     setIssue,
+    movePlayer,
+    throwEmoji,
+    useSkill,
   };
 }

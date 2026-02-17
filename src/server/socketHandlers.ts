@@ -80,6 +80,53 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket) {
     }
   });
 
+  socket.on("player:move", ({ x, y }) => {
+    const result = store.movePlayer(socket.id, x, y);
+    if (result) {
+      io.to(result.room.id).emit("player:moved", {
+        playerId: socket.id,
+        x: result.position.x,
+        y: result.position.y,
+      });
+    }
+  });
+
+  socket.on("emoji:throw", ({ targetId, emoji }) => {
+    const room = store.getRoomBySocketId(socket.id);
+    if (!room) return;
+
+    const from = room.participants.get(socket.id);
+    const target = room.participants.get(targetId);
+    if (!from || !target) return;
+
+    io.to(room.id).emit("emoji:received", {
+      id: `emoji-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      fromId: socket.id,
+      targetId,
+      emoji,
+      fromPos: from.position,
+      toPos: target.position,
+    });
+  });
+
+  socket.on("skill:use", ({ targetId, skill }) => {
+    const room = store.getRoomBySocketId(socket.id);
+    if (!room) return;
+
+    const from = room.participants.get(socket.id);
+    const target = room.participants.get(targetId);
+    if (!from || !target) return;
+
+    io.to(room.id).emit("skill:received", {
+      id: `skill-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      fromId: socket.id,
+      targetId,
+      skill,
+      fromPos: from.position,
+      toPos: target.position,
+    });
+  });
+
   socket.on("disconnect", () => {
     const room = store.handleDisconnect(socket.id);
     if (room) {

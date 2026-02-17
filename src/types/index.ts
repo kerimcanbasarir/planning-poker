@@ -1,3 +1,18 @@
+export interface Position {
+  x: number;
+  y: number;
+}
+
+export type SkillType = "fireball" | "freeze" | "zap" | "heal";
+
+export interface SkillDef {
+  type: SkillType;
+  emoji: string;
+  label: string;
+  color: string;
+  cooldown: number; // ms
+}
+
 export interface Participant {
   id: string;
   name: string;
@@ -5,6 +20,7 @@ export interface Participant {
   isCreator: boolean;
   vote: string | null;
   isConnected: boolean;
+  position: Position;
 }
 
 export type Phase = "voting" | "revealed";
@@ -47,11 +63,31 @@ export interface ParticipantView {
   vote: string | null; // null when voting phase and not own vote
   hasVoted: boolean;
   isConnected: boolean;
+  position: Position;
 }
 
 export interface VoteResults {
   average: number | null;
   distribution: Record<string, number>;
+}
+
+// Animation payloads
+export interface EmojiAnimation {
+  id: string;
+  fromId: string;
+  targetId: string;
+  emoji: string;
+  fromPos: Position;
+  toPos: Position;
+}
+
+export interface SkillAnimation {
+  id: string;
+  fromId: string;
+  targetId: string;
+  skill: SkillType;
+  fromPos: Position;
+  toPos: Position;
 }
 
 // Socket events
@@ -62,6 +98,9 @@ export interface ClientToServerEvents {
   "vote:reveal": () => void;
   "vote:reset": () => void;
   "issue:set": (data: { issue: string }) => void;
+  "player:move": (data: { x: number; y: number }) => void;
+  "emoji:throw": (data: { targetId: string; emoji: string }) => void;
+  "skill:use": (data: { targetId: string; skill: SkillType }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -69,4 +108,7 @@ export interface ServerToClientEvents {
   "room:state": (data: RoomView) => void;
   "room:error": (data: { message: string }) => void;
   "vote:results": (data: VoteResults) => void;
+  "player:moved": (data: { playerId: string; x: number; y: number }) => void;
+  "emoji:received": (data: { id: string; fromId: string; targetId: string; emoji: string; fromPos: Position; toPos: Position }) => void;
+  "skill:received": (data: { id: string; fromId: string; targetId: string; skill: SkillType; fromPos: Position; toPos: Position }) => void;
 }

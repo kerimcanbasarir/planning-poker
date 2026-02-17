@@ -1,4 +1,4 @@
-import { Room, Participant, RoomView, ParticipantView, CardSetType } from "../types";
+import { Room, Participant, RoomView, ParticipantView, CardSetType, Position } from "../types";
 import { generateRoomId } from "../lib/utils";
 
 const rooms = new Map<string, Room>();
@@ -9,6 +9,76 @@ const socketRoomMap = new Map<string, string>();
 // Grace period timers for disconnected users
 const disconnectTimers = new Map<string, NodeJS.Timeout>();
 
+// Arena dimensions
+const ARENA_W = 800;
+const ARENA_H = 500;
+const MIN_DISTANCE = 80;
+
+function getEllipsePosition(index: number, total: number): Position {
+  const cx = ARENA_W / 2;
+  const cy = ARENA_H / 2;
+  const rx = ARENA_W * 0.35;
+  const ry = ARENA_H * 0.35;
+  const angle = (2 * Math.PI * index) / Math.max(total, 1) - Math.PI / 2;
+  return {
+    x: Math.round(cx + rx * Math.cos(angle)),
+    y: Math.round(cy + ry * Math.sin(angle)),
+  };
+}
+
+function findSpawnPosition(room: Room): Position {
+  const count = room.participants.size;
+  // Try the next ellipse slot
+  const pos = getEllipsePosition(count, count + 1);
+  if (!isColliding(room, pos, "")) return pos;
+
+  // If colliding, search around the ellipse
+  for (let i = 0; i < 36; i++) {
+    const angle = (2 * Math.PI * i) / 36;
+    const cx = ARENA_W / 2;
+    const cy = ARENA_H / 2;
+    const candidate: Position = {
+      x: Math.round(cx + ARENA_W * 0.35 * Math.cos(angle)),
+      y: Math.round(cy + ARENA_H * 0.35 * Math.sin(angle)),
+    };
+    if (!isColliding(room, candidate, "")) return candidate;
+  }
+
+  return pos; // fallback
+}
+
+function isColliding(room: Room, pos: Position, excludeId: string): boolean {
+  for (const p of room.participants.values()) {
+    if (p.id === excludeId) continue;
+    const dx = p.position.x - pos.x;
+    const dy = p.position.y - pos.y;
+    if (Math.sqrt(dx * dx + dy * dy) < MIN_DISTANCE) return true;
+  }
+  return false;
+}
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val));
+}
+
+function findNearestFreeSpot(room: Room, target: Position, excludeId: string): Position {
+  // If not colliding, return as-is
+  if (!isColliding(room, target, excludeId)) return target;
+
+  // Search in expanding circles
+  for (let radius = MIN_DISTANCE; radius < ARENA_W; radius += 20) {
+    for (let angle = 0; angle < 360; angle += 15) {
+      const rad = (angle * Math.PI) / 180;
+      const candidate: Position = {
+        x: clamp(Math.round(target.x + radius * Math.cos(rad)), 40, ARENA_W - 40),
+        y: clamp(Math.round(target.y + radius * Math.sin(rad)), 40, ARENA_H - 40),
+      };
+      if (!isColliding(room, candidate, excludeId)) return candidate;
+    }
+  }
+  return target; // fallback
+}
+
 export function createRoom(
   roomName: string,
   cardSetType: CardSetType,
@@ -16,14 +86,6 @@ export function createRoom(
   socketId: string
 ): Room {
   const id = generateRoomId();
-  const creator: Participant = {
-    id: socketId,
-    name: userName,
-    isSpectator: false,
-    isCreator: true,
-    vote: null,
-    isConnected: true,
-  };
 
   const room: Room = {
     id,
@@ -31,12 +93,25 @@ export function createRoom(
     cardSetType,
     phase: "voting",
     currentIssue: "",
-    participants: new Map([[socketId, creator]]),
+    participants: new Map(),
     creatorId: socketId,
     createdAt: Date.now(),
   };
 
+  // Temporarily set room so findSpawnPosition can work
   rooms.set(id, room);
+
+  const creator: Participant = {
+    id: socketId,
+    name: userName,
+    isSpectator: false,
+    isCreator: true,
+    vote: null,
+    isConnected: true,
+    position: getEllipsePosition(0, 1),
+  };
+
+  room.participants.set(socketId, creator);
   socketRoomMap.set(socketId, id);
   return room;
 }
@@ -65,6 +140,7 @@ export function joinRoom(
     isCreator: false,
     vote: null,
     isConnected: true,
+    position: findSpawnPosition(room),
   };
 
   room.participants.set(socketId, participant);
@@ -80,6 +156,24 @@ export function getRoomBySocketId(socketId: string): Room | null {
   const roomId = socketRoomMap.get(socketId);
   if (!roomId) return null;
   return rooms.get(roomId) || null;
+}
+
+export function movePlayer(socketId: string, x: number, y: number): { room: Room; position: Position } | null {
+  const room = getRoomBySocketId(socketId);
+  if (!room) return null;
+
+  const participant = room.participants.get(socketId);
+  if (!participant) return null;
+
+  const target: Position = {
+    x: clamp(Math.round(x), 40, ARENA_W - 40),
+    y: clamp(Math.round(y), 40, ARENA_H - 40),
+  };
+
+  const finalPos = findNearestFreeSpot(room, target, socketId);
+  participant.position = finalPos;
+
+  return { room, position: finalPos };
 }
 
 export function castVote(socketId: string, value: string): Room | null {
@@ -220,6 +314,7 @@ export function toRoomView(room: Room, forSocketId?: string): RoomView {
             : null,
       hasVoted: p.vote !== null,
       isConnected: p.isConnected,
+      position: p.position,
     });
   }
 
