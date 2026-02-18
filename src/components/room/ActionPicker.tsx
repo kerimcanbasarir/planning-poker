@@ -13,21 +13,18 @@ interface ActionPickerProps {
 }
 
 const FAVORITES_KEY = "poker-emoji-favorites";
-const DEFAULT_FAVORITES = ["🔥", "❤️", "💩", "👍", "👎"];
+const DEFAULT_FAVORITES = ["\uD83D\uDD25", "\u2764\uFE0F", "\uD83D\uDCA9", "\uD83D\uDC4D", "\uD83D\uDC4E"];
 
 function loadFavorites(): string[] {
   try {
     const stored = localStorage.getItem(FAVORITES_KEY);
-
     if (!stored) return DEFAULT_FAVORITES;
 
     const parsed = JSON.parse(stored) as Record<string, number>;
-
     const sorted = Object.entries(parsed)
       .sort((a, b) => b[1] - a[1])
       .map(([emoji]) => emoji);
 
-    // defaultları da ekle, tekrar etmeyecek şekilde
     const merged = [
       ...sorted,
       ...DEFAULT_FAVORITES.filter((e) => !sorted.includes(e)),
@@ -68,7 +65,6 @@ export default function ActionPicker({
   const handleEmoji = (emoji: string) => {
     recordUsage(emoji);
     onEmojiSelect(emoji);
-    // favorites are NOT updated here — prevents buttons shifting mid-click
   };
 
   useEffect(() => {
@@ -100,10 +96,10 @@ export default function ActionPicker({
   const pctY = showBelow ? charPctY + 12 : charPctY - 12;
 
   // Horizontal: center on character, shift if near edges
-  const pctX = Math.max(12, Math.min(88, charPctX));
+  const pctX = Math.max(15, Math.min(85, charPctX));
 
-  // Emoji list opens to the side
-  const listOpensRight = charPctX < 60;
+  // Emoji list opens to the side with more room
+  const listOpensRight = charPctX < 55;
 
   return (
     <div
@@ -116,10 +112,10 @@ export default function ActionPicker({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-start gap-1.5" style={{ flexDirection: listOpensRight ? "row" : "row-reverse" }}>
+      <div className="flex items-start gap-2" style={{ flexDirection: listOpensRight ? "row" : "row-reverse" }}>
         {/* Main picker */}
         <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-xl shadow-2xl p-2.5">
-          {/* Favorites row */}
+          {/* Favorites row — disabled
           <div className="flex items-center gap-1.5 mb-2">
             {favorites.map((emoji, i) => (
               <button
@@ -130,17 +126,17 @@ export default function ActionPicker({
                 {emoji}
               </button>
             ))}
-            {/* <button
+            <button
               className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-600 transition-colors text-xs text-gray-400 border border-gray-600"
               onClick={() => setShowAllEmojis(!showAllEmojis)}
               title={showAllEmojis ? "Close emoji list" : "All emojis"}
-            > */}
-              {/* {showAllEmojis ? "\u2715" : "+"} */}
-            {/* </button> */}
+            >
+              {showAllEmojis ? "\u2715" : "+"}
+            </button>
           </div>
 
-          {/* Divider */}
           <div className="border-t border-gray-600 mb-2" />
+          */}
 
           {/* Skills */}
           <div className="flex gap-1 justify-center">
@@ -158,11 +154,14 @@ export default function ActionPicker({
           </div>
         </div>
 
-        {/* Emoji list panel — opens to the side */}
-        {/* {showAllEmojis && (
-          <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-xl shadow-2xl p-3">
-            <p className="text-[10px] text-gray-400 mb-2 px-0.5 font-medium">All Emojis</p>
-            <div className="grid grid-cols-5 gap-1.5 max-h-[240px] overflow-y-auto pr-1">
+        {/* Emoji list panel — disabled
+        {showAllEmojis && (
+          <div
+            className="bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-xl shadow-2xl p-4"
+            style={{ minWidth: 280 }}
+          >
+            <p className="text-[11px] text-gray-400 mb-2.5 font-medium">All Emojis</p>
+            <div className="grid grid-cols-6 gap-2 max-h-[280px] overflow-y-auto pr-1">
               {remainingEmojis.map((emoji, i) => (
                 <button
                   key={`all-${i}`}
@@ -174,7 +173,8 @@ export default function ActionPicker({
               ))}
             </div>
           </div>
-        )} */}
+        )}
+        */}
       </div>
     </div>
   );

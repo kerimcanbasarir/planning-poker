@@ -13,6 +13,7 @@ const disconnectTimers = new Map<string, NodeJS.Timeout>();
 const ARENA_W = 800;
 const ARENA_H = 500;
 const MIN_DISTANCE = 80;
+const EDGE_MARGIN = 50;
 
 function getEllipsePosition(index: number, total: number): Position {
   const cx = ARENA_W / 2;
@@ -70,8 +71,8 @@ function findNearestFreeSpot(room: Room, target: Position, excludeId: string): P
     for (let angle = 0; angle < 360; angle += 15) {
       const rad = (angle * Math.PI) / 180;
       const candidate: Position = {
-        x: clamp(Math.round(target.x + radius * Math.cos(rad)), 40, ARENA_W - 40),
-        y: clamp(Math.round(target.y + radius * Math.sin(rad)), 40, ARENA_H - 40),
+        x: clamp(Math.round(target.x + radius * Math.cos(rad)), EDGE_MARGIN, ARENA_W - EDGE_MARGIN),
+        y: clamp(Math.round(target.y + radius * Math.sin(rad)), EDGE_MARGIN, ARENA_H - EDGE_MARGIN),
       };
       if (!isColliding(room, candidate, excludeId)) return candidate;
     }
@@ -96,6 +97,7 @@ export function createRoom(
     participants: new Map(),
     creatorId: socketId,
     createdAt: Date.now(),
+    fightEnabled: true,
   };
 
   // Temporarily set room so findSpawnPosition can work
@@ -166,8 +168,8 @@ export function movePlayer(socketId: string, x: number, y: number): { room: Room
   if (!participant) return null;
 
   const target: Position = {
-    x: clamp(Math.round(x), 40, ARENA_W - 40),
-    y: clamp(Math.round(y), 40, ARENA_H - 40),
+    x: clamp(Math.round(x), EDGE_MARGIN, ARENA_W - EDGE_MARGIN),
+    y: clamp(Math.round(y), EDGE_MARGIN, ARENA_H - EDGE_MARGIN),
   };
 
   const finalPos = findNearestFreeSpot(room, target, socketId);
@@ -178,7 +180,7 @@ export function movePlayer(socketId: string, x: number, y: number): { room: Room
 
 export function castVote(socketId: string, value: string): Room | null {
   const room = getRoomBySocketId(socketId);
-  if (!room || room.phase !== "voting") return null;
+  if (!room) return null;
 
   const participant = room.participants.get(socketId);
   if (!participant || participant.isSpectator) return null;
@@ -211,6 +213,14 @@ export function setIssue(socketId: string, issue: string): Room | null {
   if (!room || room.creatorId !== socketId) return null;
 
   room.currentIssue = issue;
+  return room;
+}
+
+export function toggleFight(socketId: string): Room | null {
+  const room = getRoomBySocketId(socketId);
+  if (!room || room.creatorId !== socketId) return null;
+
+  room.fightEnabled = !room.fightEnabled;
   return room;
 }
 
@@ -326,6 +336,7 @@ export function toRoomView(room: Room, forSocketId?: string): RoomView {
     currentIssue: room.currentIssue,
     participants,
     creatorId: room.creatorId,
+    fightEnabled: room.fightEnabled,
   };
 }
 

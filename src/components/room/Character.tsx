@@ -10,14 +10,12 @@ interface CharacterProps {
   isMe: boolean;
   onClickCharacter?: (participantId: string) => void;
   activeSkillEffect?: string | null;
+  fighterSide?: "high" | "low" | null;
 }
 
 // Walking speed: server coordinate units per second
-// 100 u/s → half-arena (400u) takes 4s, short click (150u) takes 1.5s
+// 100 u/s → short click (150u) = 1.5s, medium (300u) = 3s, long (600u) = 6s
 const MOVE_SPEED = 100;
-
-// Margin from arena edges (server coords) to keep character fully visible
-const EDGE_MARGIN = 50;
 
 export default function Character({
   participant,
@@ -25,16 +23,22 @@ export default function Character({
   isMe,
   onClickCharacter,
   activeSkillEffect,
+  fighterSide,
 }: CharacterProps) {
   const { id, name, isSpectator, vote, hasVoted, isConnected, position } = participant;
   const [isWalking, setIsWalking] = useState(false);
   const walkTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // ── Visual position tracking ──
-  // Tracks the current CSS transition so we can compute WHERE the character
-  // visually IS at any moment. This prevents the "instant teleport on rapid clicks"
-  // bug where transition duration was calculated from server-position-delta instead
-  // of the actual visual distance.
+  // ── Visual position tracking ──────────────────────────────────────
+  // Tracks the active CSS transition so we can compute WHERE the character
+  // visually IS at any moment. This prevents the "instant teleport on rapid
+  // clicks" bug: without this, transition duration was calculated from
+  // server-position-delta (old target → new target), but the character was
+  // visually mid-walk somewhere else → wrong duration → teleport feeling.
+  //
+  // With this, we interpolate the character's visual position from the
+  // ongoing transition, then compute the REAL visual distance to the new
+  // target → correct, consistent walking speed every time.
   const animRef = useRef({
     fromX: position.x,
     fromY: position.y,
@@ -44,41 +48,37 @@ export default function Character({
     duration: 0,
   });
 
-  // Interpolate current visual position from the active CSS transition.
-  // Uses linear interpolation to match CSS `transition-timing-function: linear`.
   function getCurrentVisualPos(): { x: number; y: number } {
     const a = animRef.current;
     if (a.duration <= 0) return { x: a.toX, y: a.toY };
     const elapsed = (performance.now() - a.startTime) / 1000;
     const t = Math.min(1, elapsed / a.duration);
+    // Linear interpolation — matches CSS `linear` easing
     return {
       x: a.fromX + (a.toX - a.fromX) * t,
       y: a.fromY + (a.toY - a.fromY) * t,
     };
   }
 
-  // ── Transition calculation ──
-  // Compute distance from VISUAL position (where the character appears on screen)
-  // to the new target. This is the key to consistent movement speed:
-  // - Single click: visual pos == idle pos → full distance → proportional duration
-  // - Rapid click mid-walk: visual pos == interpolated mid-point → correct remaining distance
+  // ── Transition calculation ────────────────────────────────────────
+  // Distance from VISUAL position to new target.
+  // If character is idle: visual == target → dist is full click distance.
+  // If character is mid-walk: visual is interpolated → dist is the real
+  // remaining/redirected distance → correct transition duration.
   const currentVisual = getCurrentVisualPos();
   const dx = position.x - currentVisual.x;
   const dy = position.y - currentVisual.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
   const hasMoved = dist > 2;
 
-  // Duration = visual_distance / speed, clamped to [0.35s, 8s]
-  // 0.35s min: even tiny nudges feel deliberate
-  // Examples at 100 u/s:
-  //   50u keyboard step → 0.5s (nice step feel)
-  //   200u short click  → 2.0s (calm walk)
-  //   500u long click   → 5.0s (long stroll)
+  // Duration = visual_distance / speed
+  // Min 0.35s: even tiny nudges feel deliberate, never "instant"
+  // Max 8s: cross-arena walks don't take forever
   const transitionSec = hasMoved ? Math.max(0.35, Math.min(dist / MOVE_SPEED, 8)) : 0;
 
   useEffect(() => {
     if (hasMoved) {
-      // Snapshot the visual position RIGHT NOW as the transition start point
+      // Snapshot visual position as the start of new transition
       const visual = getCurrentVisualPos();
       animRef.current = {
         fromX: visual.x,
@@ -96,7 +96,7 @@ export default function Character({
         transitionSec * 1000 + 80
       );
     } else {
-      // Tiny or no movement — just snap the animation target
+      // Tiny/no movement — update target without animating
       animRef.current.toX = position.x;
       animRef.current.toY = position.y;
       animRef.current.duration = 0;
@@ -104,9 +104,17 @@ export default function Character({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position.x, position.y]);
 
-  // Clamp display position so the character never goes outside the arena visually
-  const displayX = Math.max(EDGE_MARGIN, Math.min(ARENA_W - EDGE_MARGIN, position.x));
-  const displayY = Math.max(EDGE_MARGIN, Math.min(ARENA_H - EDGE_MARGIN, position.y));
+  // ── Position as percentage ────────────────────────────────────────
+  // The key trick for keeping characters fully inside the container:
+  //   left: pctX%   +   transform: translate(-pctX%, -pctY%)
+  //
+  // At pctX=0%:   left=0%, translateX=0%      → left edge at container left   ✓
+  // At pctX=50%:  left=50%, translateX=-50%    → centered                      ✓
+  // At pctX=100%: left=100%, translateX=-100%  → right edge at container right ✓
+  //
+  // The character is ALWAYS fully inside, no clipping at edges.
+  const pctX = (position.x / ARENA_W) * 100;
+  const pctY = (position.y / ARENA_H) * 100;
 
   const getCardDisplay = () => {
     if (isSpectator) return null;
@@ -127,11 +135,11 @@ export default function Character({
     <div
       className={`absolute flex flex-col items-center select-none ${skillGlowClass}`}
       style={{
-        left: `${(displayX / ARENA_W) * 100}%`,
-        top: `${(displayY / ARENA_H) * 100}%`,
-        transform: "translate(-50%, -50%)",
-        transition: hasMoved
-          ? `left ${transitionSec}s linear, top ${transitionSec}s linear`
+        left: `${pctX}%`,
+        top: `${pctY}%`,
+        transform: `translate(-${pctX}%, -${pctY}%)`,
+        transition: transitionSec > 0
+          ? `left ${transitionSec}s linear, top ${transitionSec}s linear, transform ${transitionSec}s linear`
           : "none",
         zIndex: 10,
         cursor: isMe ? "default" : "pointer",
@@ -144,6 +152,11 @@ export default function Character({
         }
       }}
     >
+      {/* Fighter badge */}
+      {fighterSide && (
+        <span className={`text-base leading-none mb-0.5 ${fighterSide === "high" ? "fighter-badge-high" : "fighter-badge-low"}`}>&#9876;&#65039;</span>
+      )}
+
       {/* Card */}
       <div
         className={`
@@ -170,15 +183,19 @@ export default function Character({
         )}
       </div>
 
-      {/* Legs — taller and more visible */}
-      <div className={`flex gap-[3px] ${isWalking ? "character-walking" : ""}`}>
-        <div className="character-leg-left w-[4px] h-5 bg-gray-400 rounded-b-full" />
-        <div className="character-leg-right w-[4px] h-5 bg-gray-400 rounded-b-full" />
+      {/* Legs with cute shoes */}
+      <div className={`flex gap-[4px] ${isWalking ? "character-walking" : ""}`}>
+        <div className="character-leg-left relative w-[4px] h-5 bg-gray-400">
+          <div className="absolute -bottom-[4px] -left-[3px] w-[10px] h-[6px] bg-amber-700 rounded-t-[2px] rounded-b-[4px]" />
+        </div>
+        <div className="character-leg-right relative w-[4px] h-5 bg-gray-400">
+          <div className="absolute -bottom-[4px] -left-[3px] w-[10px] h-[6px] bg-amber-700 rounded-t-[2px] rounded-b-[4px]" />
+        </div>
       </div>
 
       {/* Name */}
       <span
-        className={`text-[10px] mt-0.5 truncate max-w-[70px] text-center font-medium ${
+        className={`text-[10px] mt-1.5 truncate max-w-[70px] text-center font-medium ${
           isMe ? "text-yellow-300" : !isConnected ? "text-gray-600 line-through" : "text-gray-300"
         }`}
         title={name}

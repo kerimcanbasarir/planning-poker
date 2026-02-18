@@ -11,6 +11,7 @@ import ControlPanel from "@/components/room/ControlPanel";
 import ParticipantList from "@/components/room/ParticipantList";
 import ResultsPanel from "@/components/room/ResultsPanel";
 import InviteLink from "@/components/room/InviteLink";
+import StoryPointTable from "@/components/room/StoryPointTable";
 
 function RoomContent({ roomId }: { roomId: string }) {
   const [joined, setJoined] = useState(false);
@@ -70,17 +71,23 @@ function RoomView() {
 
           <ControlPanel isCreator={isCreator} phase={room.phase} />
 
-          {!isSpectator && room.phase === "voting" && (
-            <CardDeck
-              cardSetType={room.cardSetType}
-              myVote={me?.vote ?? null}
-            />
+          {!isSpectator && (
+            <div>
+              {room.phase === "revealed" && (
+                <p className="text-center text-xs text-gray-400 mb-1">Fikrini değiştirebilirsin</p>
+              )}
+              <CardDeck
+                cardSetType={room.cardSetType}
+                myVote={me?.vote ?? null}
+              />
+            </div>
           )}
         </main>
 
         {/* Sidebar */}
         <aside className="w-64 border-l border-gray-800 overflow-y-auto hidden lg:block">
           <ParticipantList participants={room.participants} phase={room.phase} />
+          <StoryPointTable cardSetType={room.cardSetType} />
         </aside>
       </div>
     </div>

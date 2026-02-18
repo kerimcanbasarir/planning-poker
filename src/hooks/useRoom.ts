@@ -145,6 +145,10 @@ export function useRoom(socket: TypedSocket | null) {
     [socket]
   );
 
+  const toggleFight = useCallback(() => {
+    socket?.emit("fight:toggle");
+  }, [socket]);
+
   return {
     room,
     results,
@@ -161,5 +165,6 @@ export function useRoom(socket: TypedSocket | null) {
     movePlayer,
     throwEmoji,
     useSkill,
+    toggleFight,
   };
 }

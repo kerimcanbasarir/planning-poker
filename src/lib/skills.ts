@@ -36,6 +36,8 @@ export const EMOJIS = [
   "\uD83D\uDC80", "\uD83D\uDD25", "\u2764\uFE0F", "\uD83D\uDC40", "\uD83D\uDE4C",
   "\uD83D\uDE31", "\uD83E\uDD21", "\uD83D\uDCAF", "\u2705", "\u274C",
   "\uD83C\uDFAF", "\uD83D\uDE80", "\uD83C\uDF1F", "\uD83D\uDCA9", "\uD83E\uDD0D",
+  "\uD83E\uDD2F", "\uD83E\uDD73", "\uD83D\uDE4A", "\uD83E\uDD1D", "\u2615",
+  "\uD83E\uDD26", "\uD83D\uDE0E", "\uD83D\uDC4F", "\uD83D\uDE44", "\uD83D\uDE18",
 ];
 
 // Arena coordinate system (shared with server)

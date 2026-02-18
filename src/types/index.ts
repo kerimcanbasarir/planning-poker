@@ -34,6 +34,7 @@ export interface Room {
   participants: Map<string, Participant>;
   creatorId: string;
   createdAt: number;
+  fightEnabled: boolean;
 }
 
 export type CardSetType = "fibonacci" | "tshirt";
@@ -53,6 +54,7 @@ export interface RoomView {
   currentIssue: string;
   participants: ParticipantView[];
   creatorId: string;
+  fightEnabled: boolean;
 }
 
 export interface ParticipantView {
@@ -101,6 +103,7 @@ export interface ClientToServerEvents {
   "player:move": (data: { x: number; y: number }) => void;
   "emoji:throw": (data: { targetId: string; emoji: string }) => void;
   "skill:use": (data: { targetId: string; skill: SkillType }) => void;
+  "fight:toggle": () => void;
 }
 
 export interface ServerToClientEvents {

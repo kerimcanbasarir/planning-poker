@@ -54,6 +54,10 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket) {
     const room = store.castVote(socket.id, value);
     if (room) {
       broadcastRoomState(io, room.id);
+      if (room.phase === "revealed") {
+        const results = computeResults(room.participants);
+        io.to(room.id).emit("vote:results", results);
+      }
     }
   });
 
@@ -125,6 +129,13 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket) {
       fromPos: from.position,
       toPos: target.position,
     });
+  });
+
+  socket.on("fight:toggle", () => {
+    const room = store.toggleFight(socket.id);
+    if (room) {
+      broadcastRoomState(io, room.id);
+    }
   });
 
   socket.on("disconnect", () => {

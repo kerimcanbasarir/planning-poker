@@ -93,3 +93,36 @@
   position: absolute;
   z-index: 100;
 }
+
+/* ===== Fighter badge pulse ===== */
+@keyframes swordPulseGold {
+  0%, 100% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(255, 220, 0, 0.9)) drop-shadow(0 0 16px rgba(255, 180, 0, 0.5));
+  }
+  50% {
+    transform: scale(1.4);
+    filter: drop-shadow(0 0 18px rgba(255, 220, 0, 1)) drop-shadow(0 0 32px rgba(255, 180, 0, 0.8));
+  }
+}
+
+@keyframes swordPulseRed {
+  0%, 100% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(255, 50, 50, 0.9)) drop-shadow(0 0 16px rgba(255, 0, 0, 0.5));
+  }
+  50% {
+    transform: scale(1.4);
+    filter: drop-shadow(0 0 18px rgba(255, 50, 50, 1)) drop-shadow(0 0 32px rgba(255, 0, 0, 0.8));
+  }
+}
+
+.fighter-badge-high {
+  animation: swordPulseGold 0.8s ease-in-out infinite;
+  font-size: 1.25rem;
+}
+
+.fighter-badge-low {
+  animation: swordPulseRed 0.8s ease-in-out infinite;
+  font-size: 1.25rem;
+}

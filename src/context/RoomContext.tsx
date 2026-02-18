@@ -34,6 +34,7 @@ interface RoomContextValue {
   movePlayer: (x: number, y: number) => void;
   throwEmoji: (targetId: string, emoji: string) => void;
   useSkill: (targetId: string, skill: SkillType) => void;
+  toggleFight: () => void;
 }
 
 const RoomContext = createContext<RoomContextValue | null>(null);
