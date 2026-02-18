@@ -115,7 +115,7 @@ export default function ActionPicker({
       <div className="flex items-start gap-2" style={{ flexDirection: listOpensRight ? "row" : "row-reverse" }}>
         {/* Main picker */}
         <div className="bg-gray-800/95 backdrop-blur-sm border border-gray-600 rounded-xl shadow-2xl p-2.5">
-          {/* Favorites row — disabled
+          {/* Favorites row */}
           <div className="flex items-center gap-1.5 mb-2">
             {favorites.map((emoji, i) => (
               <button
@@ -126,6 +126,7 @@ export default function ActionPicker({
                 {emoji}
               </button>
             ))}
+            {/* All emojis button — disabled
             <button
               className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-600 transition-colors text-xs text-gray-400 border border-gray-600"
               onClick={() => setShowAllEmojis(!showAllEmojis)}
@@ -133,10 +134,11 @@ export default function ActionPicker({
             >
               {showAllEmojis ? "\u2715" : "+"}
             </button>
+            */}
           </div>
 
+          {/* Divider */}
           <div className="border-t border-gray-600 mb-2" />
-          */}
 
           {/* Skills */}
           <div className="flex gap-1 justify-center">
